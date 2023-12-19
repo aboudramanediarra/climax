@@ -1,0 +1,34 @@
+<?xml version="1.0"?>  
+<class>  
+    <client>  
+        <nom>Naman</nom>  
+        <prenom>Kumar</prenom>  
+        <age>15</age>  
+        <profession>tailleur</profession> 
+        <salaire>83</salaire> 
+    </client>  
+      
+    <client>  
+        <nom>Kapil</nom>  
+        <prenom>Kumar</prenom>  
+        <age>55</age>  
+        <profession>soudeur</profession>  
+        <salaire>83</salaire>
+    </client>  
+  
+    <client>  
+        <nom>Harsh</nom>  
+        <prenom>Singh</prenom>  
+        <age>66</age>  
+        <profession>eboueur</profession>
+        <salaire>83</salaire>  
+    </client>  
+  
+    <client>  
+        <nom>Jitesh</nom>  
+        <prenom>Singh</prenom>  
+        <age>45</age>  
+        <profession>ingenieur</profession> 
+        <salaire>83</salaire> 
+    </client>  
+</class> 

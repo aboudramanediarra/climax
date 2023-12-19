@@ -1,0 +1,20 @@
+[
+	{
+		"client": {
+			"nom": "Tall",
+			"prenom": "Rama",
+			"age": "8",
+			"profession": "mengere",
+			"salaire": "80"
+		}
+	},
+	{
+		"client": {
+			"nom": "Schultz",
+			"prenom": "Schultz",
+			"age": "56",
+			"profession": "Schultz",
+			"salaire": "1500"
+		}
+	}
+]

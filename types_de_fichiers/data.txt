@@ -1,0 +1,2 @@
+terra,amed,28,ingenieur,1200;
+traore,jaques,35,menuisier,2000;
