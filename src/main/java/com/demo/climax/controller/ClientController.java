@@ -7,11 +7,11 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xwpf.usermodel.*;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
-import org.springframework.data.jpa.repository.Query;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.ui.Model;
@@ -24,6 +24,7 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
+import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -33,25 +34,26 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @RestController
 public class ClientController {
 
     private final ClientRepository clientRepository;
-    Model model1;
+
     public ClientController(ClientRepository clientRepository) {
         this.clientRepository = clientRepository;
-
     }
 
-    @GetMapping("/clients")
+    @GetMapping("/getClients")
     public ResponseEntity<List<Client>> getAllClient(Model model) {
         List<Client> list = clientRepository.findAll();
         model.addAttribute("listClients", list);
         return new ResponseEntity<>(list, HttpStatus.OK);
     }
 
-    @GetMapping("/moyenne")
+    @GetMapping("/getMoyenne")
     public ResponseEntity<List<Moyenne>> getMoyenne(){
 
         HashMap<String, Long> list = new HashMap<String, Long>();
@@ -62,7 +64,6 @@ public class ClientController {
 
         List<Moyenne> moyenneList = new ArrayList<>();
         for (String i : list.keySet()) {
-            System.out.println("Job: " + i + " Moyenne des salaires: " + list.get(i));
             Moyenne moyenne = new Moyenne();
             moyenne.setProfession(i);
             moyenne.setSalaireMoy(Math.toIntExact(list.get(i)));
@@ -70,10 +71,11 @@ public class ClientController {
         }
         return new ResponseEntity<>(moyenneList, HttpStatus.OK);
     }
-    @PostMapping("/import")
+    @PostMapping("/importFile")
     public String fileUpload(@RequestParam("file") MultipartFile file) throws IOException, InvalidFormatException, ParserConfigurationException, SAXException {
+        //files must not have a header
         String extension = StringUtils.getFilenameExtension(file.getOriginalFilename());
-        if (extension.equals("xlsx")) {
+        if (extension.equals("xlsx") || extension.equals("xls")) {
             readXLSXFile(file.getInputStream());
         } else if (extension.equals("csv")) {
             readCSVFile(file.getInputStream());
@@ -83,13 +85,15 @@ public class ClientController {
             readJSONFile(file.getInputStream());
         }else if(extension.equals("txt")){
             readTXTFile(file.getInputStream());
+        }else if(extension.equals("docx")){
+            readDOCXFile(file.getInputStream());
         }
         return "index";
     }
 
-    public void readXLSXFile(InputStream inputStream) {
+    private void readXLSXFile(InputStream inputStream) {
         try {
-            //XLSX file must have a header as nom,prenom,age,profession,salaire
+
             Workbook workbook = new XSSFWorkbook(inputStream);
             Sheet firstSheet = workbook.getSheetAt(0);
             Iterator<Row> iterator = firstSheet.iterator();
@@ -116,7 +120,7 @@ public class ClientController {
         }
     }
 
-    public void readCSVFile(InputStream file) {
+    private void readCSVFile(InputStream file) {
         String delimiter = ",";
         String line = "";
         try {
@@ -132,72 +136,61 @@ public class ClientController {
                 clientRepository.save(client);
             }
             file.close();
+            fileReader.close();
         } catch (IOException | UncheckedIOException e) {
         }
     }
-    public void readXMLFile(InputStream inputStream) throws ParserConfigurationException, IOException, SAXException {
+
+    private void readXMLFile(InputStream file) throws ParserConfigurationException, IOException, SAXException {
         DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
         DocumentBuilder db = dbf.newDocumentBuilder();
-        Document doc = db.parse(inputStream);
+        Document doc = db.parse(file);
         doc.getDocumentElement().normalize();
         Client client = new Client();
         NodeList nodeList = doc.getElementsByTagName("client");
         for (int itr = 0; itr < nodeList.getLength(); itr++) {
             Node node = nodeList.item(itr);
-            System.out.println("\nNode Name :" + node.getNodeName());
             if (node.getNodeType() == Node.ELEMENT_NODE) {
-                Element eElement = (Element) node;
-                client.setNom(eElement.getElementsByTagName("nom").item(0).getTextContent());
-                client.setPrenom(eElement.getElementsByTagName("prenom").item(0).getTextContent());
-                client.setAge(Integer.parseInt(eElement.getElementsByTagName("age").item(0).getTextContent()));
-                client.setProfession(eElement.getElementsByTagName("profession").item(0).getTextContent());
-                client.setSalaire(Integer.parseInt(eElement.getElementsByTagName("salaire").item(0).getTextContent()));
-                clientRepository.save(client);
+                try {
+                    Element eElement = (Element) node;
+                    client.setNom(eElement.getElementsByTagName("nom").item(0).getTextContent());
+                    client.setPrenom(eElement.getElementsByTagName("prenom").item(0).getTextContent());
+                    client.setAge(Integer.parseInt(eElement.getElementsByTagName("age").item(0).getTextContent()));
+                    client.setProfession(eElement.getElementsByTagName("profession").item(0).getTextContent());
+                    client.setSalaire(Integer.parseInt(eElement.getElementsByTagName("salaire").item(0).getTextContent()));
+                    clientRepository.save(client);
+                }catch (Exception e) {
+                }
+
             }
         }
+        file.close();
     }
 
-    public void readJSONFile(InputStream file) throws IOException {
-        JSONParser jsonParser = new JSONParser();
-        JSONObject clients;
+    private void readJSONFile(InputStream file) throws IOException {
+        ObjectMapper objectMapper = new ObjectMapper();
         try {
-            //Read JSON file
-            Object obj = jsonParser.parse(new InputStreamReader(file));
-            JSONArray clientList = (JSONArray) obj;
-
-            Iterator iterator = clientList.iterator();
-            while (iterator.hasNext()){
-                JSONObject cltObject = (JSONObject) iterator.next();
-                cltObject.get("client");
-                String nom = (String) cltObject.get("nom");
-                String prenom = (String) cltObject.get("prenom");
-                String age = (String) cltObject.get("age");
-                String profession = (String) cltObject.get("profession");
-                String salaire = (String) cltObject.get("salaire");
+            List<Client> clientList = objectMapper.readValue(file, new TypeReference<List<Client>>() {});
+            for (Client clt : clientList) {
                 Client client = new Client();
-                client.setNom(nom);
-                client.setPrenom(prenom);
-                client.setAge(Integer.parseInt(age));
-                client.setProfession(profession);
-                client.setSalaire(Integer.parseInt(salaire));
+                client.setNom(clt.getNom());
+                client.setPrenom(clt.getPrenom());
+                client.setAge((clt.getAge()));
+                client.setProfession(clt.getProfession());
+                client.setSalaire(clt.getSalaire());
                 clientRepository.save(client);
-                System.out.println(nom +" "+ " "+ prenom+" "+ age+" "+ profession+" "+salaire);
             }
             file.close();
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
-        } catch (ParseException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    public void readTXTFile(InputStream inputStream) throws IOException {
+
+    private void readTXTFile(InputStream inputStream) throws IOException {
         BufferedReader br = new BufferedReader(new InputStreamReader(inputStream));
         String line;
         while((line = br.readLine()) != null){
-            //process the line
             try{
                 String nom = line.substring(0,line.indexOf(","));
                 line = line.substring(line.indexOf(",")+1);
@@ -216,8 +209,39 @@ public class ClientController {
                 client.setSalaire(salaire);
                 clientRepository.save(client);
             }catch (Exception e){
+                e.printStackTrace();
             }
         }
         br.close();
     }
+    private void readDOCXFile(InputStream file) throws IOException {
+
+        XWPFDocument document = new XWPFDocument(file);
+        List<XWPFTable> tables = document.getTables();
+        if (!tables.isEmpty()) {
+            XWPFTable table = tables.get(0);
+            // iteration sur les lignes
+            for (XWPFTableRow row : table.getRows()) {
+                try {
+                    String nom = row.getCell(0).getText();
+                    String prenom = row.getCell(1).getText();
+                    int age = Integer.parseInt(row.getCell(2).getText());
+                    String proff = row.getCell(3).getText();
+                    int sal = Integer.parseInt(row.getCell(4).getText());
+                    Client client = new Client();
+                    client.setNom(nom);
+                    client.setPrenom(prenom);
+                    client.setAge(age);
+                    client.setProfession(proff);
+                    client.setSalaire(sal);
+                    clientRepository.save(client);
+                }catch (Exception e){
+                }
+            }
+        }
+
+        document.close();
+        file.close();
+    }
+
 }
