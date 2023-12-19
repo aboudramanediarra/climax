@@ -6,7 +6,7 @@ CREATE TABLE client (id INT NOT NULL AUTO_INCREMENT ,nom VARCHAR(100) NOT NULL ,
                      age INT NOT NULL ,profession VARCHAR(100) NOT NULL ,salaire INT NOT NULL ,PRIMARY KEY (id));
 
 
-CREATE USER 'sa'@'localhost' IDENTIFIED BY '7229';
+CREATE USER 'sa'@'localhost' IDENTIFIED BY '1212';
 
 GRANT ALL PRIVILEGES ON testdb.* TO 'sa'@'localhost';
 
